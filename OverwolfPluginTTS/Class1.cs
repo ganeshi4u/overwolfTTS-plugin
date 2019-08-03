@@ -5,11 +5,12 @@ using CSCore;
 using CSCore.MediaFoundation;
 using CSCore.SoundOut;
 using System.IO;
-using System.Reflection;
 using System.Web;
 using System.Web.Script.Serialization;
 using System.Linq;
 using System.Threading;
+using WindowsInput.Native;
+using WindowsInput;
 
 namespace OverwolfPluginTTS
 {
@@ -28,6 +29,7 @@ namespace OverwolfPluginTTS
         public static int outputDevice = 0;
         public static int narratorVolume = 80;
         public static string speechVoice = "Microsoft David Desktop";
+        public static string voiceKey = "";
 
         public void setNarratorSettings ()
         {
@@ -39,13 +41,20 @@ namespace OverwolfPluginTTS
                 outputDevice = Int32.Parse(json_data.output_device);
                 narratorVolume = Int32.Parse(json_data.narrator_volume_slider);
                 speechVoice = json_data.narrator_voice;
+                voiceKey = json_data.voice_key;
             }
         }
 
         public void getNarratorSettings (Action<object> callback)
         {
             setNarratorSettings();
-            List<object> settings = new List<object>() { narrator_toggle, speechVoice, outputDevice, speechRate, narratorVolume };
+            List<object> settings = new List<object>();
+            settings.Add(narrator_toggle);
+            settings.Add(speechVoice);
+            settings.Add(outputDevice);
+            settings.Add(speechRate);
+            settings.Add(narratorVolume);
+            settings.Add(voiceKey);
             callback(settings.ToArray());
         }
 
@@ -96,6 +105,7 @@ namespace OverwolfPluginTTS
                     return;
                 }
 
+                var ins = new InputSimulator();
                 var memoryStream = new MemoryStream();
                 speechSynthesizerObj.Rate = speechRate;
                 speechSynthesizerObj.SelectVoice(speechVoice);
@@ -107,8 +117,10 @@ namespace OverwolfPluginTTS
                 using (var waveSource = new MediaFoundationDecoder(memoryStream))
                 {
                     waveOut.Initialize(waveSource);
+                    ins.Keyboard.KeyDown(VirtualKeyCode.VK_K);
                     waveOut.Play();
                     waveOut.WaitForStopped();
+                    ins.Keyboard.KeyUp(VirtualKeyCode.VK_K);
                 }
             }
         }
@@ -139,7 +151,6 @@ namespace OverwolfPluginTTS
             List<string> avail_output_devices = new List<string>();
             List<int> avail_output_devices_id = new List<int>();
 
-            //AppDomain.CurrentDomain.AssemblyResolve += CurrentDomain_AssemblyResolve;
             foreach (var device in WaveOutDevice.EnumerateDevices())
             {
                 avail_output_devices.Add(device.Name);
@@ -151,15 +162,5 @@ namespace OverwolfPluginTTS
             else
                 callback(false, "", "");
         }
-
-        /*private Assembly CurrentDomain_AssemblyResolve(object sender, ResolveEventArgs args)
-        {
-            using (var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("EmbedAssembly.CSCore.dll"))
-            {
-                byte[] assemblyData = new byte[stream.Length];
-                stream.Read(assemblyData, 0, assemblyData.Length);
-                return Assembly.Load(assemblyData);
-            }
-        }*/
     }
 }
